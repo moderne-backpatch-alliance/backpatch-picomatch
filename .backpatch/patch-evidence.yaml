@@ -1,0 +1,21 @@
+schema: osera-patch-evidence/0.1.0
+producer: moderne
+release: 4.0.8-backpatch-00001
+baseline: v4.0.7+backpatch.baseline
+fixes:
+  - cve: CVE-2026-112366
+    advisory_url: https://nvd.nist.gov/vuln/detail/CVE-2026-112366
+    patch_commit_url: https://github.com/moderne-backpatch-alliance/backpatch-picomatch/commit/72fb0050d22c2979baa6c639b9e6e0879e2a0b13
+    not_applicable_rationale: a provider-developed fix; no upstream-authored code to credit
+    basis: original
+    artifacts:
+      - picomatch
+    note: "New in this release; written for 4.0.7, upstream's latest release, ahead of an upstream fix: micromatch/picomatch#194, which the advisory links, leaves `+(*a)` exponential. A repeated extglob whose only branch holds a `*` of its own now compiles once, `+(X)` as `@(X)` and `*(X)` as `?(X)`, which matches the same strings without the nested quantifier, and a lone `@(...)` branch counts as its alternatives, so `+(@(a|aa))` is literalized as `+(a|aa)` already is. Upstream's next release is expected to carry its own fix and replaces this one once our CVE tests pass against it."
+tests:
+  commit: 72fb0050d22c2979baa6c639b9e6e0879e2a0b13
+  command: npm install --ignore-scripts --no-package-lock && npm run lint && npx mocha --reporter xunit --reporter-option output=reports/TEST-picomatch.xml
+  runtime: Node.js v24.21.0, npm 11.19.0, macOS 26.6 arm64
+  report: picomatch-4.0.8-backpatch-00001-tests.zip
+  report_sha256: 4d387bebd2d80ac149ffe0baac84420cb91ad85244ab01e0bcb2c14c9cc2dcf8
+  result: pass
+  note: "upstream's eslint and mocha suite at the tested commit: 1986 tests run, 0 failed, 0 skipped. The regression tests for CVE-2026-112366 are in test/options.maxExtglobRecursion.js, \"should compile a lone repeated branch with a star of its own once\" and \"should literalize a lone @() branch whose alternatives overlap\"; with the version commit's parser both fail and the file's other 12 pass."
