@@ -142,6 +142,41 @@ describe('options.maxExtglobRecursion', () => {
     assert(isMatch('+(a|aa)x', '+(a|aa)@(x)'));
     assert(!isMatch('aaax', '+(a|aa)@(x)'));
   });
+  it('should compile a lone repeated branch with a star of its own once', () => {
+    // CVE-2026-112366: `+(*a)` compiled to `(?:[^/]*?a)+`, which backtracks exponentially. The star absorbs every
+    // repetition after the first, so the branch matches the same strings once.
+    assert.strictEqual(makeRe('+(*a)').source, '^(?:(?=.)(?:[^/]*?a))$');
+    assert.strictEqual(makeRe('*(*a)').source, '^(?:(?=.)(?:[^/]*?a)?)$');
+    assert.strictEqual(makeRe('+(*)c').source, '^(?:(?=.)(?:[^/]*?)c)$');
+    assert.strictEqual(makeRe('x+(*a)y').source, '^(?:x(?:[^/]*?a)y)$');
+    assert.strictEqual(makeRe('+(@(*a))').source, '^(?:(?=.)(?:([^/]*?a)))$');
+
+    assert(isMatch('xbaa', '+(*a)'));
+    assert(!isMatch('xab', '+(*a)'));
+    assert(isMatch('abc', '+(*)c'));
+    assert(isMatch('xbay', 'x+(*a)y'));
+
+    const run = 'a'.repeat(64);
+    for (const pattern of ['+(*)', '+(*a)', '*(*a)', '+(a*)', '+(*a*)', '+(*)c', '+([ab]*)', '+(@(*a))']) {
+      for (const str of [run + '!', run + '/']) {
+        const start = Date.now();
+        isMatch(str, pattern);
+        assert(Date.now() - start < 1000, `${pattern} took ${Date.now() - start} ms`);
+      }
+    }
+  });
+
+  it('should keep repeating a lone branch whose star cannot absorb a repetition', () => {
+    assert.strictEqual(makeRe('+(a/*)').source, '^(?:(?=.)(?:a\\/(?!\\.)(?=.)[^/]*?)+)$');
+    assert.strictEqual(makeRe('+(\\*a)').source, '^(?:(?=.)(?:\\*a)+)$');
+    assert(isMatch('a/xa/y', '+(a/*)'));
+  });
+
+  it('should literalize a lone @() branch whose alternatives overlap', () => {
+    assert.strictEqual(makeRe('+(@(a|aa))').source, '^(?:\\+\\(@\\(a\\|aa\\)\\))$');
+    assert(!isMatch('a'.repeat(64) + '!', '+(@(a|aa))'));
+  });
+
   it('should disable the safeguard when maxExtglobRecursion is false', () => {
     assert(
       /\(\?:a\|aa\)\+/.test(
